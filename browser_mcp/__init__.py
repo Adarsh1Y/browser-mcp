@@ -1,5 +1,7 @@
-"""Browser MCP - Lightweight WebKitGTK-based browser for Model Context Protocol."""
+"""Browser MCP - A lightweight browser server for the Model Context Protocol."""
 
-from .server import server, main
+from browser_mcp.server import server, main
 
-__all__ = ["server", "main"]
+__version__ = "0.2.0"
+
+__all__ = ["server", "main", "__version__"]

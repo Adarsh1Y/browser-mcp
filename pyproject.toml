@@ -1,14 +1,52 @@
 [project]
 name = "browser-mcp"
-version = "0.1.0"
-description = "Lightweight browser MCP server using WebKitGTK"
+version = "0.2.0"
+description = "A lightweight, headless browser MCP server powered by WebKitGTK. Browse the web, take screenshots, and interact with pages through AI assistants."
+readme = "README.md"
+license = {text = "MIT"}
 requires-python = ">=3.10"
+authors = [
+    {name = "Adarsh Yadav", email = "adarsh@example.com", github = "Adarsh1Y"}
+]
+keywords = ["mcp", "browser", "webkit", "web", "scraping", "ai", "claude"]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: OS Independent",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: Internet :: WWW/HTTP :: Browsers",
+    "Topic :: Software Development :: Libraries :: Python Modules",
+]
 dependencies = [
     "mcp[cli]>=1.0.0",
 ]
 
 [project.optional-dependencies]
-dev = ["pytest", "pytest-asyncio"]
+dev = [
+    "pytest>=7.0.0",
+    "pytest-asyncio>=0.21.0",
+    "pytest-cov>=4.0.0",
+    "ruff>=0.1.0",
+    "mypy>=1.0.0",
+]
+webkit = [
+    "PyGObject>=3.40.0",
+    "pycairo>=1.20.0",
+]
+
+[project.scripts]
+browser-mcp = "browser_mcp.cli:main"
+
+[project.urls]
+Homepage = "https://github.com/Adarsh1Y/browser-mcp"
+Documentation = "https://github.com/Adarsh1Y/browser-mcp#readme"
+Repository = "https://github.com/Adarsh1Y/browser-mcp"
+Issues = "https://github.com/Adarsh1Y/browser-mcp/issues"
+Changelog = "https://github.com/Adarsh1Y/browser-mcp/blob/main/CHANGELOG.md"
 
 [build-system]
 requires = ["hatchling"]
@@ -16,3 +54,35 @@ build-backend = "hatchling.build"
 
 [tool.hatch.build.targets.wheel]
 packages = ["browser_mcp"]
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+testpaths = ["tests"]
+python_files = ["test_*.py"]
+python_functions = ["test_*"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py310"
+select = ["E", "F", "W", "I", "N", "UP", "B", "C4"]
+ignore = ["E501"]
+
+[tool.ruff.per-file-ignores]
+"__init__.py" = ["F401"]
+
+[tool.mypy]
+python_version = "3.10"
+warn_return_any = true
+warn_unused_ignores = true
+ignore_missing_imports = true
+
+[tool.coverage.run]
+source = ["browser_mcp"]
+branch = true
+
+[tool.coverage.report]
+exclude_lines = [
+    "pragma: no cover",
+    "if TYPE_CHECKING:",
+    "raise NotImplementedError",
+]

@@ -1,65 +1,224 @@
-# Browser MCP
+# 🌐 Browser MCP
 
-Lightweight browser MCP server using WebKitGTK.
+> A lightweight, headless browser server for the Model Context Protocol (MCP)
 
-## Features
+[![PyPI Version](https://img.shields.io/pypi/v/browser-mcp.svg)](https://pypi.org/project/browser-mcp/)
+[![Python](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+[![GitHub stars](https://img.shields.io/github/stars/Adarsh1Y/browser-mcp?style=social)](https://github.com/Adarsh1Y/browser-mcp)
 
-- Navigate to URLs
-- Extract page content (HTML/text)
-- Click elements
-- Fill forms
-- Take screenshots
-- Execute JavaScript
-- Find elements
+Browser MCP brings web browsing capabilities to AI assistants. Navigate pages, extract content, take screenshots, and interact with web elements - all through the MCP protocol.
 
-## Install Dependencies
+## ✨ Features
+
+- 🌐 **Navigate & Browse** - Load any URL and browse the web
+- 📸 **Screenshots** - Capture full pages or visible portions
+- 🔍 **Content Extraction** - Get HTML or plain text from pages
+- 🖱️ **Element Interaction** - Click, fill forms, and interact
+- 📜 **JavaScript Execution** - Run custom JS in the page context
+- 🔧 **Find Elements** - Locate elements by CSS selector or XPath
+- 🍪 **Cookie Management** - Access browser cookies
+
+## 📦 Installation
+
+### Quick Install
 
 ```bash
-# Ubuntu/Debian
+pip install browser-mcp
+```
+
+### System Dependencies
+
+**Ubuntu / Debian:**
+```bash
 sudo apt install libwebkit2gtk-4.1-dev python3-gi python3-gi-cairo gir1.2-webkit2-4.1
+```
 
-# Fedora
+**Fedora:**
+```bash
 sudo dnf install webkit2gtk4.1-devel pygobject3 cairo-gobject
-
-# macOS
-brew install pygobject3 webkitgtk@4.1
 ```
 
-## Install Package
-
+**Arch Linux:**
 ```bash
-pip install -e .
+sudo pacman -S webkit2gtk4.1 python-gobject python-cairo gobject-introspection
 ```
 
-## Usage
+**macOS:**
+```bash
+brew install webkitgtk4.1 gobject-introspection pygobject3 py3cairo
+```
+
+## 🚀 Usage
+
+### CLI
 
 ```bash
-# Run as MCP server
+# Run directly
 python -m browser_mcp
 
-# Or use with Claude CLI
-claude mcp add browser python -m browser_mcp
+# Or install and run
+pip install browser-mcp
+browser-mcp
 ```
 
-## Available Tools
+### With Claude Desktop
 
-| Tool | Description |
-|------|-------------|
-| `navigate` | Navigate to URL |
-| `get_page_content` | Get HTML |
-| `get_text` | Get visible text |
-| `click` | Click element |
-| `fill` | Fill input field |
-| `screenshot` | Take screenshot |
-| `execute_js` | Run JavaScript |
-| `find_elements` | Find matching elements |
-| `get_cookies` | Get browser cookies |
+Add to your `claude_desktop_config.json`:
 
-## Example
+```json
+{
+  "mcpServers": {
+    "browser": {
+      "command": "python",
+      "args": ["-m", "browser_mcp"]
+    }
+  }
+}
+```
+
+### With n8n
+
+```javascript
+// In your n8n MCP node configuration
+{
+  "command": "python",
+  "args": ["-m", "browser_mcp"]
+}
+```
+
+## 🛠️ Available Tools
+
+| Tool | Description | Parameters |
+|------|-------------|------------|
+| `navigate` | Navigate to a URL | `url`, `wait` (optional) |
+| `get_page_content` | Get page HTML | - |
+| `get_text` | Extract visible text | - |
+| `click` | Click an element | `selector`, `xpath` (optional) |
+| `fill` | Fill an input | `selector`, `value` |
+| `screenshot` | Take a screenshot | `path`, `full_page` (optional) |
+| `execute_js` | Run JavaScript | `script` |
+| `find_elements` | Find elements | `selector`, `xpath` (optional) |
+| `get_cookies` | Get cookies | - |
+
+## 💡 Examples
+
+### Basic Navigation
 
 ```python
-# MCP tool calls
+# Navigate to a page
 {"name": "navigate", "arguments": {"url": "https://example.com"}}
+
+# Get the page text
 {"name": "get_text", "arguments": {}}
-{"name": "click", "arguments": {"selector": "button.submit"}}
 ```
+
+### Form Interaction
+
+```python
+# Fill a search box and search
+{"name": "fill", "arguments": {"selector": "input[name='q']", "value": "search query"}}
+{"name": "click", "arguments": {"selector": "button[type='submit']"}}
+```
+
+### Screenshot
+
+```python
+# Take a screenshot
+{"name": "screenshot", "arguments": {"path": "/tmp/page.png"}}
+```
+
+### Custom JavaScript
+
+```python
+# Extract specific data with JS
+{"name": "execute_js", "arguments": {"script": "document.title"}}
+{"name": "execute_js", "arguments": {"script": "[...document.querySelectorAll('a')].map(a => a.href)"}}
+```
+
+## 🔧 Development
+
+```bash
+# Clone the repo
+git clone https://github.com/Adarsh1Y/browser-mcp
+cd browser-mcp
+
+# Create virtual environment
+python -m venv .venv
+source .venv/bin/activate  # Linux/macOS
+# .venv\Scripts\activate   # Windows
+
+# Install with dev dependencies
+pip install -e ".[dev,webkit]"
+
+# Run tests
+pytest
+
+# Lint
+ruff check .
+
+# Type check
+mypy browser_mcp
+```
+
+## 📁 Project Structure
+
+```
+browser-mcp/
+├── browser_mcp/
+│   ├── __init__.py       # Package init
+│   ├── __main__.py       # Entry point
+│   ├── browser.py        # WebKit browser wrapper
+│   ├── server.py         # MCP server implementation
+│   └── cli.py            # CLI interface
+├── tests/
+│   └── test_browser.py   # Unit tests
+├── examples/
+│   └── basic_usage.py    # Usage examples
+├── pyproject.toml        # Project config
+├── README.md
+├── LICENSE
+├── CONTRIBUTING.md
+└── CHANGELOG.md
+```
+
+## 🐛 Troubleshooting
+
+### "WebKitGTK not available"
+
+Make sure system dependencies are installed:
+```bash
+sudo apt install libwebkit2gtk-4.1-dev python3-gi python3-gi-cairo gir1.2-webkit2-4.1
+```
+
+### Headless environment issues
+
+WebKitGTK requires a display. In headless environments, use Xvfb:
+```bash
+xvfb-run python -m browser_mcp
+```
+
+### Permission denied on screenshot
+
+Ensure the target directory is writable:
+```bash
+chmod 755 /tmp
+```
+
+## 🤝 Contributing
+
+Contributions are welcome! Please see [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines.
+
+## 📝 License
+
+MIT License - see [LICENSE](LICENSE) for details.
+
+## ⭐ Show Your Support
+
+Give a ⭐ if this project helped you!
+
+[![GitHub stars](https://img.shields.io/github/stars/Adarsh1Y/browser-mcp?style=social)](https://github.com/Adarsh1Y/browser-mcp)
+
+---
+
+Made with ❤️ for the AI community

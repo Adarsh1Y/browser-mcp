@@ -1,6 +1,10 @@
+"""MCP server implementation for browser control."""
+
+from __future__ import annotations
+
 import asyncio
-from contextlib import AsyncExitStack
 from pathlib import Path
+from typing import TYPE_CHECKING, Any
 
 try:
     from .browser import WebKitBrowser
@@ -14,36 +18,47 @@ from mcp.types import Tool, TextContent
 server = Server("browser-mcp")
 
 
-def get_browser():
+def get_browser() -> "WebKitBrowser":
+    """Create and return a browser instance."""
     if WebKitBrowser is None:
-        raise ImportError("WebKitGTK not available. Install with: apt install libwebkit2gtk-4.1-dev python3-gi python3-gi-cairo gir1.2-webkit2-4.1")
+        raise ImportError(
+            "WebKitGTK not available. Install with:\n"
+            "  Ubuntu/Debian: sudo apt install libwebkit2gtk-4.1-dev python3-gi python3-gi-cairo gir1.2-webkit2-4.1\n"
+            "  Fedora: sudo dnf install webkit2gtk4.1-devel pygobject3 cairo-gobject\n"
+            "  Arch: sudo pacman -S webkit2gtk4.1 python-gobject python-cairo gobject-introspection"
+        )
     return WebKitBrowser()
 
 
 @server.list_tools()
 async def list_tools() -> list[Tool]:
+    """List all available browser tools."""
     return [
         Tool(
             name="navigate",
-            description="Navigate to a URL and return page content",
+            description="Navigate to a URL and return page information",
             inputSchema={
                 "type": "object",
                 "properties": {
                     "url": {"type": "string", "description": "URL to navigate to"},
-                    "wait": {"type": "number", "description": "Seconds to wait after load", "default": 2}
+                    "wait": {
+                        "type": "number",
+                        "description": "Seconds to wait after page load",
+                        "default": 2.0,
+                    },
                 },
-                "required": ["url"]
-            }
+                "required": ["url"],
+            },
         ),
         Tool(
             name="get_page_content",
             description="Get the current page HTML content",
-            inputSchema={"type": "object", "properties": {}}
+            inputSchema={"type": "object", "properties": {}},
         ),
         Tool(
             name="get_text",
             description="Extract visible text from the page",
-            inputSchema={"type": "object", "properties": {}}
+            inputSchema={"type": "object", "properties": {}},
         ),
         Tool(
             name="click",
@@ -52,22 +67,26 @@ async def list_tools() -> list[Tool]:
                 "type": "object",
                 "properties": {
                     "selector": {"type": "string", "description": "CSS selector or XPath"},
-                    "xpath": {"type": "boolean", "description": "If true, treat selector as XPath", "default": False}
+                    "xpath": {
+                        "type": "boolean",
+                        "description": "If true, treat selector as XPath",
+                        "default": False,
+                    },
                 },
-                "required": ["selector"]
-            }
+                "required": ["selector"],
+            },
         ),
         Tool(
             name="fill",
-            description="Fill an input field",
+            description="Fill an input field with text",
             inputSchema={
                 "type": "object",
                 "properties": {
                     "selector": {"type": "string", "description": "CSS selector for the input"},
-                    "value": {"type": "string", "description": "Value to fill"}
+                    "value": {"type": "string", "description": "Value to fill"},
                 },
-                "required": ["selector", "value"]
-            }
+                "required": ["selector", "value"],
+            },
         ),
         Tool(
             name="screenshot",
@@ -76,113 +95,137 @@ async def list_tools() -> list[Tool]:
                 "type": "object",
                 "properties": {
                     "path": {"type": "string", "description": "Path to save screenshot"},
-                    "full_page": {"type": "boolean", "description": "Capture full page", "default": False}
+                    "full_page": {
+                        "type": "boolean",
+                        "description": "Capture full page instead of visible area",
+                        "default": False,
+                    },
                 },
-                "required": ["path"]
-            }
+                "required": ["path"],
+            },
         ),
         Tool(
             name="execute_js",
-            description="Execute JavaScript and return result",
+            description="Execute JavaScript and return the result",
             inputSchema={
                 "type": "object",
                 "properties": {
-                    "script": {"type": "string", "description": "JavaScript code to execute"}
+                    "script": {"type": "string", "description": "JavaScript code to execute"},
                 },
-                "required": ["script"]
-            }
+                "required": ["script"],
+            },
         ),
         Tool(
             name="find_elements",
-            description="Find elements matching a selector",
+            description="Find all elements matching a selector",
             inputSchema={
                 "type": "object",
                 "properties": {
-                    "selector": {"type": "string", "description": "CSS selector"},
-                    "xpath": {"type": "boolean", "description": "If true, treat as XPath", "default": False}
+                    "selector": {"type": "string", "description": "CSS selector or XPath"},
+                    "xpath": {
+                        "type": "boolean",
+                        "description": "If true, treat selector as XPath",
+                        "default": False,
+                    },
                 },
-                "required": ["selector"]
-            }
+                "required": ["selector"],
+            },
         ),
         Tool(
             name="get_cookies",
             description="Get all browser cookies",
-            inputSchema={"type": "object", "properties": {}}
+            inputSchema={"type": "object", "properties": {}},
         ),
     ]
 
 
+async def run_in_thread(func: Any, *args: Any) -> Any:
+    """Run a blocking function in a thread pool."""
+    loop = asyncio.get_event_loop()
+    return await loop.run_in_executor(None, func, *args)
+
+
 @server.call_tool()
-async def call_tool(name: str, arguments: dict) -> list[TextContent]:
+async def call_tool(name: str, arguments: dict[str, Any]) -> list[TextContent]:
+    """Handle tool calls from the MCP client."""
     browser = get_browser()
-    
+
     try:
         if name == "navigate":
-            result = await asyncio.get_event_loop().run_in_executor(
-                None, browser.navigate, arguments.get("url"), arguments.get("wait", 2)
-            )
-            return [TextContent(type="text", text=f"Navigated to {arguments['url']}\nTitle: {result['title']}\nURL: {result['url']}")]
+            url = arguments["url"]
+            wait = arguments.get("wait", 2.0)
+            result = await run_in_thread(browser.navigate, url, wait)
+            return [
+                TextContent(
+                    type="text",
+                    text=f"Navigated to {url}\nTitle: {result['title']}\nURL: {result['url']}",
+                )
+            ]
 
         elif name == "get_page_content":
-            result = await asyncio.get_event_loop().run_in_executor(None, browser.get_html)
+            result = await run_in_thread(browser.get_html)
             return [TextContent(type="text", text=result)]
 
         elif name == "get_text":
-            result = await asyncio.get_event_loop().run_in_executor(None, browser.get_text)
+            result = await run_in_thread(browser.get_text)
             return [TextContent(type="text", text=result)]
 
         elif name == "click":
+            selector = arguments["selector"]
             xpath = arguments.get("xpath", False)
-            await asyncio.get_event_loop().run_in_executor(
-                None, lambda: browser.click(arguments["selector"], is_xpath=xpath)
-            )
-            return [TextContent(type="text", text=f"Clicked: {arguments['selector']}")]
+            result = await run_in_thread(browser.click, selector, xpath)
+            return [TextContent(type="text", text=f"Clicked: {selector}\nResult: {result}")]
 
         elif name == "fill":
-            await asyncio.get_event_loop().run_in_executor(
-                None, lambda: browser.fill(arguments["selector"], arguments["value"])
-            )
-            return [TextContent(type="text", text=f"Filled '{arguments['value']}' in {arguments['selector']}")]
+            selector = arguments["selector"]
+            value = arguments["value"]
+            result = await run_in_thread(browser.fill, selector, value)
+            return [
+                TextContent(type="text", text=f"Filled '{value}' in {selector}\nResult: {result}")
+            ]
 
         elif name == "screenshot":
             path = Path(arguments["path"])
             path.parent.mkdir(parents=True, exist_ok=True)
-            await asyncio.get_event_loop().run_in_executor(
-                None, lambda: browser.screenshot(str(path), arguments.get("full_page", False))
-            )
-            return [TextContent(type="text", text=f"Screenshot saved to {path}")]
+            full_page = arguments.get("full_page", False)
+            result = await run_in_thread(browser.screenshot, str(path), full_page)
+            return [TextContent(type="text", text=f"Screenshot saved to {result}")]
 
         elif name == "execute_js":
-            result = await asyncio.get_event_loop().run_in_executor(
-                None, browser.execute_js, arguments["script"]
-            )
-            return [TextContent(type="text", text=str(result))]
+            script = arguments["script"]
+            result = await run_in_thread(browser.run_javascript_sync, script)
+            return [TextContent(type="text", text=str(result) if result else "null")]
 
         elif name == "find_elements":
+            selector = arguments["selector"]
             xpath = arguments.get("xpath", False)
-            result = await asyncio.get_event_loop().run_in_executor(
-                None, lambda: browser.find_elements(arguments["selector"], is_xpath=xpath)
-            )
-            return [TextContent(type="text", text=f"Found {len(result)} elements:\n" + "\n".join(result))]
+            elements = await run_in_thread(browser.find_elements, selector, xpath)
+            if not elements:
+                return [TextContent(type="text", text="No elements found")]
+            return [
+                TextContent(
+                    type="text", text=f"Found {len(elements)} elements:\n" + "\n".join(elements)
+                )
+            ]
 
         elif name == "get_cookies":
-            result = await asyncio.get_event_loop().run_in_executor(None, browser.get_cookies)
+            result = await run_in_thread(browser.get_cookies)
             return [TextContent(type="text", text=str(result))]
 
         else:
             return [TextContent(type="text", text=f"Unknown tool: {name}")]
+
     except Exception as e:
-        return [TextContent(type="text", text=f"Error: {str(e)}")]
-    finally:
-        pass
+        return [TextContent(type="text", text=f"Error: {type(e).__name__}: {str(e)}")]
 
 
-async def main():
+async def main() -> None:
+    """Main entry point for the MCP server."""
     async with stdio_server() as (read_stream, write_stream):
         await server.run(
             read_stream,
             write_stream,
-            server.create_initialization_options()
+            server.create_initialization_options(),
         )
 
 
