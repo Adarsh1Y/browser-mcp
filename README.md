@@ -107,7 +107,7 @@ Add to your `claude_desktop_config.json`:
 
 ```python
 # Navigate to a page
-{"name": "navigate", "arguments": {"url": "https://example.com"}}
+{"name": "navigate", "arguments": {"url": "https://google.com"}}
 
 # Get the page text
 {"name": "get_text", "arguments": {}}
