@@ -283,6 +283,73 @@ async def list_tools() -> list[Tool]:
                 "required": ["selector", "n"],
             },
         ),
+        Tool(
+            name="type_slow",
+            description="Type text with human-like keystroke timing",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "selector": {"type": "string", "description": "CSS selector for input field"},
+                    "text": {"type": "string", "description": "Text to type"},
+                    "speed": {"type": "string", "description": "Typing speed: subtle, normal, extreme", "default": "normal"},
+                },
+                "required": ["selector", "text"],
+            },
+        ),
+        Tool(
+            name="move_to",
+            description="Move mouse to element with smooth hover",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "selector": {"type": "string", "description": "CSS selector"},
+                },
+                "required": ["selector"],
+            },
+        ),
+        Tool(
+            name="scroll_slow",
+            description="Scroll smoothly with human-like timing",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "direction": {"type": "string", "description": "Direction: up, down, top, bottom"},
+                    "distance": {"type": "integer", "description": "Distance in pixels", "default": 300},
+                    "speed": {"type": "string", "description": "Speed: subtle, normal, extreme", "default": "normal"},
+                },
+            },
+        ),
+        Tool(
+            name="random_pause",
+            description="Pause for random duration (like human thinking)",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "min_sec": {"type": "number", "description": "Minimum pause seconds", "default": 1},
+                    "max_sec": {"type": "number", "description": "Maximum pause seconds", "default": 3},
+                },
+            },
+        ),
+        Tool(
+            name="hesitant_click",
+            description="Click with hesitation - pause before clicking",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "selector": {"type": "string", "description": "CSS selector"},
+                    "xpath": {"type": "boolean", "description": "If true, treat selector as XPath", "default": False},
+                },
+                "required": ["selector"],
+            },
+        ),
+        Tool(
+            name="scan_page",
+            description="Simulate human scanning the page",
+            inputSchema={
+                "type": "object",
+                "properties": {},
+            },
+        ),
     ]
 
 
@@ -441,6 +508,41 @@ async def call_tool(name: str, arguments: dict[str, Any]) -> list[TextContent]:
             n = arguments.get("n", 1)
             result = await run_in_thread(browser.click_nth, selector, n)
             return [TextContent(type="text", text=f"Click #{n}: {result}")]
+
+        elif name == "type_slow":
+            selector = arguments.get("selector", "")
+            text = arguments.get("text", "")
+            speed = arguments.get("speed", "normal")
+            result = await run_in_thread(browser.type_slow, selector, text, speed)
+            return [TextContent(type="text", text=f"Typed: {result}")]
+
+        elif name == "move_to":
+            selector = arguments.get("selector", "")
+            result = await run_in_thread(browser.move_to, selector)
+            return [TextContent(type="text", text=result)]
+
+        elif name == "scroll_slow":
+            direction = arguments.get("direction", "down")
+            distance = arguments.get("distance", 300)
+            speed = arguments.get("speed", "normal")
+            result = await run_in_thread(browser.scroll_slow, direction, distance, speed)
+            return [TextContent(type="text", text=f"Scrolled: {result}")]
+
+        elif name == "random_pause":
+            min_sec = arguments.get("min_sec")
+            max_sec = arguments.get("max_sec")
+            result = await run_in_thread(browser.random_pause, min_sec, max_sec)
+            return [TextContent(type="text", text=result)]
+
+        elif name == "hesitant_click":
+            selector = arguments.get("selector", "")
+            xpath = arguments.get("xpath", False)
+            result = await run_in_thread(browser.hesitant_click, selector, xpath)
+            return [TextContent(type="text", text=f"Hesitant click: {result}")]
+
+        elif name == "scan_page":
+            result = await run_in_thread(browser.scan_page)
+            return [TextContent(type="text", text=result)]
 
         else:
             return [TextContent(type="text", text=f"Unknown tool: {name}")]

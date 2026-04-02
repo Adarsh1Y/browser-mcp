@@ -4,6 +4,7 @@ import json
 import os
 import subprocess
 import tempfile
+import random
 
 try:
     import gi
@@ -15,7 +16,7 @@ except (ImportError, ValueError) as e:
 
 
 class WebKitBrowser:
-    def __init__(self, width: int = 1024, height: int = 768, auto_screenshot: bool = False):
+    def __init__(self, width: int = 1024, height: int = 768, auto_screenshot: bool = False, human_speed: str = "normal"):
         if not WEBKIT_AVAILABLE:
             raise ImportError("WebKitGTK not available")
         
@@ -29,6 +30,14 @@ class WebKitBrowser:
         self._auto_screenshot = auto_screenshot
         self._last_screenshot_path = None
         self._console_messages = []
+        
+        # Human behavior settings
+        self._human_speed = human_speed
+        self._speed_config = {
+            "subtle": {"keystroke_ms": (30, 70), "pause_sec": (0.5, 1.5), "think_sec": (0.5, 1.5)},
+            "normal": {"keystroke_ms": (80, 150), "pause_sec": (1.0, 2.5), "think_sec": (1.0, 3.0)},
+            "extreme": {"keystroke_ms": (150, 250), "pause_sec": (2.0, 4.0), "think_sec": (2.0, 5.0)},
+        }
         
         from gi.repository import Gtk
         self._window = Gtk.Window()
@@ -154,21 +163,143 @@ class WebKitBrowser:
         script = f"(function(){{var els=document.querySelectorAll('{selector}');if(els[{n-1}]{{els[{n-1}].click();return'clicked ' + ({n});}}return'not found';}})()"
         return self._execute_js(script)
 
-    def _on_load_changed(self, view, load_event):
-        if load_event == WebKit.LoadEvent.FINISHED:
-            self._ready.set()
+    # ========== Human-Like Behavior Methods ==========
 
-    def _on_progress_changed(self, view, progress):
-        if view.get_estimated_load_progress() >= 1.0:
-            self._snapshot_ready.set()
+    def _get_timing(self, timing_type: str) -> tuple:
+        """Get timing values based on human speed setting."""
+        config = self._speed_config.get(self._human_speed, self._speed_config["normal"])
+        timing = config.get(timing_type, config["pause_sec"])
+        return timing
 
-    def _process_events(self, duration: float = 0.1):
-        end_time = time.time() + duration
-        while time.time() < end_time:
-            GLib.MainContext.default().iteration(False)
-            time.sleep(0.01)
+    def _random_delay(self, timing_type: str):
+        """Sleep for a random duration based on timing type."""
+        timing = self._get_timing(timing_type)
+        delay = random.uniform(timing[0], timing[1])
+        time.sleep(delay)
 
-    def navigate(self, url: str, wait: float = 2.0) -> dict:
+    def type_slow(self, selector: str, text: str, speed: str = None) -> str:
+        """Type text with human-like keystroke timing."""
+        if speed is None:
+            speed = self._human_speed
+        
+        speed_config = self._speed_config.get(speed, self._speed_config["normal"])
+        keystroke_range = speed_config["keystroke_ms"]
+        
+        # Clear field first
+        self._execute_js(f"document.querySelector('{selector}').value = '';")
+        
+        for char in text:
+            # Type each character with random delay
+            delay = random.uniform(keystroke_range[0], keystroke_range[1]) / 1000.0
+            time.sleep(delay)
+            
+            # Append character using JS
+            escaped_char = char.replace("'", "\\'")
+            self._execute_js(f"""
+                var el = document.querySelector('{selector}');
+                el.value += '{escaped_char}';
+                el.dispatchEvent(new Event('input', {{bubbles: true}}));
+            """)
+        
+        # Trigger change event
+        self._execute_js(f"document.querySelector('{selector}').dispatchEvent(new Event('change', {{bubbles: true}}));")
+        
+        return f"typed {len(text)} characters"
+
+    def move_to(self, selector: str, duration: float = 0.5) -> str:
+        """Move mouse smoothly to element (simulated with hover)."""
+        result = self.hover(selector)
+        # Add slight delay after hovering
+        time.sleep(duration)
+        return result
+
+    def scroll_slow(self, direction: str = "down", distance: int = 300, speed: str = None) -> str:
+        """Scroll smoothly with human-like timing."""
+        if speed is None:
+            speed = self._human_speed
+        
+        speed_config = self._speed_config.get(speed, self._speed_config["normal"])
+        pause_range = speed_config["pause_sec"]
+        
+        # Convert direction to scroll amount
+        direction_map = {
+            "down": distance,
+            "up": -distance,
+            "top": -999999,
+            "bottom": 999999,
+            "down-half": lambda: self._execute_js("window.scrollBy(0, window.innerHeight / 2)"),
+            "up-half": lambda: self._execute_js("window.scrollBy(0, -window.innerHeight / 2)"),
+        }
+        
+        if direction in ["top", "bottom"]:
+            self._execute_js(f"window.scrollTo(0, {direction_map[direction]})")
+        elif direction in ["down-half", "up-half"]:
+            direction_map[direction]()
+        else:
+            # Smooth scroll in steps
+            steps = 5
+            step_size = distance // steps
+            for _ in range(steps):
+                self._execute_js(f"window.scrollBy(0, {step_size})")
+                time.sleep(random.uniform(pause_range[0], pause_range[1]) / steps)
+        
+        return f"scrolled {direction}"
+
+    def random_pause(self, min_sec: float = None, max_sec: float = None) -> str:
+        """Pause for a random duration (like human thinking)."""
+        if min_sec is None or max_sec is None:
+            think_range = self._get_timing("think_sec")
+            min_sec = think_range[0]
+            max_sec = think_range[1]
+        
+        delay = random.uniform(min_sec, max_sec)
+        time.sleep(delay)
+        return f"paused for {delay:.2f}s"
+
+    def hesitant_click(self, selector: str, is_xpath: bool = False) -> str:
+        """Click with hesitation - pause before clicking."""
+        # First hover/move to element
+        self.move_to(selector, duration=0.3)
+        # Random pause before clicking (hesitation)
+        self._random_delay("think_sec")
+        # Now click
+        return self.click(selector, is_xpath)
+
+    def scan_page(self) -> str:
+        """Simulate human scanning the page - scroll a bit up and down."""
+        # Quick scroll down
+        self.scroll_slow("down", 200, speed="subtle")
+        time.sleep(0.5)
+        # Quick scroll back up
+        self.scroll_slow("up", 200, speed="subtle")
+        return "scanned page"
+
+    # ========== Enhanced Existing Methods with Human Mode ==========
+
+    def fill(self, selector: str, value: str, human: bool = True) -> str:
+        """Fill input field with optional human-like typing."""
+        if human:
+            return self.type_slow(selector, value)
+        else:
+            # Original fast fill
+            safe_value = value.replace("'", "\\'")
+            script = f"(function(){{var el=document.querySelector('{selector}');if(el){{el.value='{safe_value}';el.dispatchEvent(new Event('input',{{bubbles:true}}));el.dispatchEvent(new Event('change',{{bubbles:true}}));return'filled';}}return'not found';}})()"
+            return self._execute_js(script)
+
+    def click(self, selector: str, is_xpath: bool = False, human: bool = True) -> str:
+        """Click element with optional human-like behavior."""
+        if human:
+            return self.hesitant_click(selector, is_xpath)
+        else:
+            # Original fast click
+            if is_xpath:
+                script = f"(function() {{var el=document.evaluate('{selector}',document,null,XPathResult.FIRST_ORDERED_NODE_TYPE,null).singleNodeValue;if(el){{el.click();return'clicked';}}return'not found';}})()"
+            else:
+                script = f"(function() {{var el=document.querySelector('{selector}');if(el){{el.click();return'clicked';}}return'not found';}})()"
+            return self._execute_js(script)
+
+    def navigate(self, url: str, wait: float = 2.0, human: bool = True) -> dict:
+        """Navigate to URL with optional human-like reading pause."""
         with self._lock:
             self._ready.clear()
             self._snapshot_ready.clear()
@@ -183,6 +314,10 @@ class WebKitBrowser:
             time.sleep(wait)
             self._process_events(1.0)
             
+            if human:
+                # Add reading pause after page load
+                self._random_delay("think_sec")
+            
             if self._auto_screenshot:
                 self._last_screenshot_path = self._screenshot_gtk("/tmp/auto_screenshot.png", False)
             
@@ -190,6 +325,20 @@ class WebKitBrowser:
                 "url": self.view.get_uri() or url,
                 "title": self.view.get_title() or ""
             }
+
+    def _on_load_changed(self, view, load_event):
+        if load_event == WebKit.LoadEvent.FINISHED:
+            self._ready.set()
+
+    def _on_progress_changed(self, view, progress):
+        if view.get_estimated_load_progress() >= 1.0:
+            self._snapshot_ready.set()
+
+    def _process_events(self, duration: float = 0.1):
+        end_time = time.time() + duration
+        while time.time() < end_time:
+            GLib.MainContext.default().iteration(False)
+            time.sleep(0.01)
 
     def set_auto_screenshot(self, enabled: bool):
         """Enable or disable auto-screenshot on navigation."""
@@ -244,18 +393,6 @@ class WebKitBrowser:
             self._process_events(0.1)
         
         return self._js_result
-
-    def click(self, selector: str, is_xpath: bool = False):
-        if is_xpath:
-            script = f"(function() {{var el=document.evaluate('{selector}',document,null,XPathResult.FIRST_ORDERED_NODE_TYPE,null).singleNodeValue;if(el){{el.click();return'clicked';}}return'not found';}})()"
-        else:
-            script = f"(function() {{var el=document.querySelector('{selector}');if(el){{el.click();return'clicked';}}return'not found';}})()"
-        return self._execute_js(script)
-
-    def fill(self, selector: str, value: str):
-        safe_value = value.replace("'", "\\'")
-        script = f"(function(){{var el=document.querySelector('{selector}');if(el){{el.value='{safe_value}';el.dispatchEvent(new Event('input',{{bubbles:true}}));el.dispatchEvent(new Event('change',{{bubbles:true}}));return'filled';}}return'not found';}})()"
-        return self._execute_js(script)
 
     def screenshot(self, path: str, full_page: bool = False) -> str:
         with self._lock:

@@ -5,6 +5,23 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.6.0] - 2026-04-03
+
+### Added
+- Human-like behavior system with configurable speed levels (subtle/normal/extreme)
+- type_slow tool - Typing with human-like keystroke timing
+- move_to tool - Smooth hover to element
+- scroll_slow tool - Smooth scrolling with timing variation
+- random_pause tool - Random thinking pauses
+- hesitant_click tool - Click with hesitation
+- scan_page tool - Simulate human scanning the page
+- human_speed parameter in browser constructor
+
+### Enhanced
+- fill() now accepts human=True parameter for realistic typing
+- click() now accepts human=True parameter for hesitation
+- navigate() now accepts human=True for reading pause after load
+
 ## [0.5.0] - 2026-04-03
 
 ### Added
