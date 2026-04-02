@@ -32,18 +32,18 @@ def get_browser() -> "WebKitBrowser":
 
 @server.list_tools()
 async def list_tools() -> list[Tool]:
-    """List all available browser tools."""
+    """List all available browser tools. 🌍"""
     return [
         Tool(
             name="navigate",
-            description="Navigate to a URL and return page information",
+            description="🌐 Navigate to a URL and return page information\n🔗 किसी URL पर जाएं और पेज जानकारी प्राप्त करें",
             inputSchema={
                 "type": "object",
                 "properties": {
-                    "url": {"type": "string", "description": "URL to navigate to"},
+                    "url": {"type": "string", "description": "🌍 URL to navigate to / जाने के लिए URL"},
                     "wait": {
                         "type": "number",
-                        "description": "Seconds to wait after page load",
+                        "description": "⏱️ Seconds to wait after page load / पेज लोड होने के बाद इंतजार सेकंड",
                         "default": 2.0,
                     },
                 },
@@ -52,24 +52,24 @@ async def list_tools() -> list[Tool]:
         ),
         Tool(
             name="get_page_content",
-            description="Get the current page HTML content",
+            description="📄 Get the current page HTML content\n🌍 वर्तमान पेज का HTML कंटेंट प्राप्त करें",
             inputSchema={"type": "object", "properties": {}},
         ),
         Tool(
             name="get_text",
-            description="Extract visible text from the page",
+            description="📝 Extract visible text from the page\n🔤 पेज से दिखाई देने वाला टेक्स्ट निकालें",
             inputSchema={"type": "object", "properties": {}},
         ),
         Tool(
             name="click",
-            description="Click an element by CSS selector or XPath",
+            description="🖱️ Click an element by CSS selector or XPath\n👆 CSS selector या XPath से एलिमेंट पर क्लिक करें",
             inputSchema={
                 "type": "object",
                 "properties": {
-                    "selector": {"type": "string", "description": "CSS selector or XPath"},
+                    "selector": {"type": "string", "description": "🎯 CSS selector or XPath / CSS selector या XPath"},
                     "xpath": {
                         "type": "boolean",
-                        "description": "If true, treat selector as XPath",
+                        "description": "☑️ If true, treat selector as XPath / अगर true है, तो selector को XPath मानें",
                         "default": False,
                     },
                 },
@@ -78,26 +78,26 @@ async def list_tools() -> list[Tool]:
         ),
         Tool(
             name="fill",
-            description="Fill an input field with text",
+            description="✍️ Fill an input field with text\n📝 इनपुट फील्ड में टेक्स्ट भरें",
             inputSchema={
                 "type": "object",
                 "properties": {
-                    "selector": {"type": "string", "description": "CSS selector for the input"},
-                    "value": {"type": "string", "description": "Value to fill"},
+                    "selector": {"type": "string", "description": "🎯 CSS selector for the input / इनपुट के लिए CSS selector"},
+                    "value": {"type": "string", "description": "📃 Value to fill / भरने के लिए मान"},
                 },
                 "required": ["selector", "value"],
             },
         ),
         Tool(
             name="screenshot",
-            description="Take a screenshot of the current page",
+            description="📸 Take a screenshot of the current page\n🖼️ वर्तमान पेज का स्क्रीनशॉट लें",
             inputSchema={
                 "type": "object",
                 "properties": {
-                    "path": {"type": "string", "description": "Path to save screenshot"},
+                    "path": {"type": "string", "description": "💾 Path to save screenshot / स्क्रीनशॉट सेव करने का पाथ"},
                     "full_page": {
                         "type": "boolean",
-                        "description": "Capture full page instead of visible area",
+                        "description": "📜 Capture full page instead of visible area / दृश्य क्षेत्र के बजाय पूरा पेज कैप्चर करें",
                         "default": False,
                     },
                 },
@@ -106,25 +106,25 @@ async def list_tools() -> list[Tool]:
         ),
         Tool(
             name="execute_js",
-            description="Execute JavaScript and return the result",
+            description="📜 Execute JavaScript and return the result\n⚡ JavaScript चलाएं और परिणाम प्राप्त करें",
             inputSchema={
                 "type": "object",
                 "properties": {
-                    "script": {"type": "string", "description": "JavaScript code to execute"},
+                    "script": {"type": "string", "description": "💻 JavaScript code to execute / चलाने के लिए JavaScript कोड"},
                 },
                 "required": ["script"],
             },
         ),
         Tool(
             name="find_elements",
-            description="Find all elements matching a selector",
+            description="🔍 Find all elements matching a selector\n🔎 CSS selector या XPath से मिलने वाले सभी एलिमेंट खोजें",
             inputSchema={
                 "type": "object",
                 "properties": {
-                    "selector": {"type": "string", "description": "CSS selector or XPath"},
+                    "selector": {"type": "string", "description": "🎯 CSS selector or XPath / CSS selector या XPath"},
                     "xpath": {
                         "type": "boolean",
-                        "description": "If true, treat selector as XPath",
+                        "description": "☑️ If true, treat selector as XPath / अगर true है, तो selector को XPath मानें",
                         "default": False,
                     },
                 },
@@ -133,7 +133,7 @@ async def list_tools() -> list[Tool]:
         ),
         Tool(
             name="get_cookies",
-            description="Get all browser cookies",
+            description="🍪 Get all browser cookies\n🍪 सभी ब्राउज़र कुकीज़ प्राप्त करें",
             inputSchema={"type": "object", "properties": {}},
         ),
     ]
