@@ -17,9 +17,13 @@ from mcp.types import Tool, TextContent
 
 server = Server("browser-mcp")
 
+_browser_instance = None
+
 
 def get_browser() -> "WebKitBrowser":
-    """Create and return a browser instance."""
+    """Get or create a persistent browser instance."""
+    global _browser_instance
+    
     if WebKitBrowser is None:
         raise ImportError(
             "WebKitGTK not available. Install with:\n"
@@ -27,7 +31,22 @@ def get_browser() -> "WebKitBrowser":
             "  Fedora: sudo dnf install webkit2gtk4.1-devel pygobject3 cairo-gobject\n"
             "  Arch: sudo pacman -S webkit2gtk4.1 python-gobject python-cairo gobject-introspection"
         )
-    return WebKitBrowser()
+    
+    if _browser_instance is None:
+        _browser_instance = WebKitBrowser()
+    
+    return _browser_instance
+
+
+def reset_browser() -> None:
+    """Reset the browser instance - closes current and creates new one."""
+    global _browser_instance
+    if _browser_instance is not None:
+        try:
+            _browser_instance.close()
+        except Exception:
+            pass
+    _browser_instance = None
 
 
 @server.list_tools()
@@ -195,6 +214,16 @@ async def list_tools() -> list[Tool]:
             description="Get path to the last auto-screenshot",
             inputSchema={"type": "object", "properties": {}},
         ),
+        Tool(
+            name="reset_browser",
+            description="Reset browser - close current instance and create new one",
+            inputSchema={"type": "object", "properties": {}},
+        ),
+        Tool(
+            name="close_browser",
+            description="Close the browser and cleanup resources",
+            inputSchema={"type": "object", "properties": {}},
+        ),
     ]
 
 
@@ -314,6 +343,14 @@ async def call_tool(name: str, arguments: dict[str, Any]) -> list[TextContent]:
             if path:
                 return [TextContent(type="text", text=f"Screenshot: {path}")]
             return [TextContent(type="text", text="No screenshot available")]
+
+        elif name == "reset_browser":
+            reset_browser()
+            return [TextContent(type="text", text="Browser reset - new instance created")]
+
+        elif name == "close_browser":
+            reset_browser()
+            return [TextContent(type="text", text="Browser closed")]
 
         else:
             return [TextContent(type="text", text=f"Unknown tool: {name}")]

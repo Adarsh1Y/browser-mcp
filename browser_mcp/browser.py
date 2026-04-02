@@ -90,6 +90,13 @@ class WebKitBrowser:
         self._window.resize(width, height)
         self._process_events(0.2)
 
+    def close(self):
+        """Close the browser and cleanup resources."""
+        try:
+            self._window.destroy()
+        except Exception:
+            pass
+
     def _on_load_changed(self, view, load_event):
         if load_event == WebKit.LoadEvent.FINISHED:
             self._ready.set()
