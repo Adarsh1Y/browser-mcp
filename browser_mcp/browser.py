@@ -49,9 +49,27 @@ class WebKitBrowser:
         
         self._window.add(self.view)
         self._window.show_all()
+        
+        self._window.set_keep_above(True)
+        
         self._process_events(0.5)
         
         self._ready.clear()
+
+    def show(self):
+        """Show and raise the browser window."""
+        self._window.present()
+        self._window.show()
+        self._process_events(0.1)
+
+    def hide(self):
+        """Hide the browser window."""
+        self._window.hide()
+
+    def set_size(self, width: int, height: int):
+        """Set the window size."""
+        self._window.resize(width, height)
+        self._process_events(0.2)
 
     def _on_load_changed(self, view, load_event):
         if load_event == WebKit.LoadEvent.FINISHED:

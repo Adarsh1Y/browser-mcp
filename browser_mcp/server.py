@@ -136,6 +136,28 @@ async def list_tools() -> list[Tool]:
             description="Get all browser cookies",
             inputSchema={"type": "object", "properties": {}},
         ),
+        Tool(
+            name="show_browser",
+            description="Show the browser window",
+            inputSchema={"type": "object", "properties": {}},
+        ),
+        Tool(
+            name="hide_browser",
+            description="Hide the browser window",
+            inputSchema={"type": "object", "properties": {}},
+        ),
+        Tool(
+            name="set_browser_size",
+            description="Set the browser window size",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "width": {"type": "integer", "description": "Window width"},
+                    "height": {"type": "integer", "description": "Window height"},
+                },
+                "required": ["width", "height"],
+            },
+        ),
     ]
 
 
@@ -211,6 +233,20 @@ async def call_tool(name: str, arguments: dict[str, Any]) -> list[TextContent]:
         elif name == "get_cookies":
             result = await run_in_thread(browser.get_cookies)
             return [TextContent(type="text", text=str(result))]
+
+        elif name == "show_browser":
+            browser.show()
+            return [TextContent(type="text", text="Browser window shown")]
+
+        elif name == "hide_browser":
+            browser.hide()
+            return [TextContent(type="text", text="Browser window hidden")]
+
+        elif name == "set_browser_size":
+            width = arguments.get("width", 1024)
+            height = arguments.get("height", 768)
+            browser.set_size(width, height)
+            return [TextContent(type="text", text=f"Browser size set to {width}x{height}")]
 
         else:
             return [TextContent(type="text", text=f"Unknown tool: {name}")]
