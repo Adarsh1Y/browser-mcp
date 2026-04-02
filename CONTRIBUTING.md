@@ -11,7 +11,7 @@ Thank you for your interest in contributing! This document provides guidelines a
 ## Getting Started
 
 1. Fork the repository
-2. Clone your fork: `git clone https://github.com/YOUR_USERNAME/browser-mcp`
+2. Clone your fork: `git clone https://github.com/Adarsh1Y/browser-mcp`
 3. Create a virtual environment
 4. Install dev dependencies: `pip install -e ".[dev,webkit]"`
 5. Make your changes
