@@ -158,6 +158,43 @@ async def list_tools() -> list[Tool]:
                 "required": ["width", "height"],
             },
         ),
+        Tool(
+            name="console_logs",
+            description="Get captured console messages (errors, warnings, logs)",
+            inputSchema={"type": "object", "properties": {}},
+        ),
+        Tool(
+            name="console_clear",
+            description="Clear console message buffer",
+            inputSchema={"type": "object", "properties": {}},
+        ),
+        Tool(
+            name="repl",
+            description="Execute JavaScript and return pretty-printed result",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "script": {"type": "string", "description": "JavaScript code to execute"},
+                },
+                "required": ["script"],
+            },
+        ),
+        Tool(
+            name="set_auto_screenshot",
+            description="Enable or disable auto-screenshot on navigation",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "enabled": {"type": "boolean", "description": "Enable auto-screenshot"},
+                },
+                "required": ["enabled"],
+            },
+        ),
+        Tool(
+            name="get_last_screenshot",
+            description="Get path to the last auto-screenshot",
+            inputSchema={"type": "object", "properties": {}},
+        ),
     ]
 
 
@@ -247,6 +284,36 @@ async def call_tool(name: str, arguments: dict[str, Any]) -> list[TextContent]:
             height = arguments.get("height", 768)
             browser.set_size(width, height)
             return [TextContent(type="text", text=f"Browser size set to {width}x{height}")]
+
+        elif name == "console_logs":
+            logs = await run_in_thread(browser.get_console_messages)
+            if not logs:
+                return [TextContent(type="text", text="No console messages")]
+            formatted = []
+            for log in logs:
+                formatted.append(f"[{log['source']}:{log['line']}] {log['message']}")
+            return [TextContent(type="text", text="\n".join(formatted))]
+
+        elif name == "console_clear":
+            await run_in_thread(browser.clear_console)
+            return [TextContent(type="text", text="Console cleared")]
+
+        elif name == "repl":
+            script = arguments["script"]
+            result = await run_in_thread(browser.repl, script)
+            return [TextContent(type="text", text=result)]
+
+        elif name == "set_auto_screenshot":
+            enabled = arguments.get("enabled", False)
+            await run_in_thread(browser.set_auto_screenshot, enabled)
+            status = "enabled" if enabled else "disabled"
+            return [TextContent(type="text", text=f"Auto-screenshot {status}")]
+
+        elif name == "get_last_screenshot":
+            path = await run_in_thread(browser.get_last_screenshot)
+            if path:
+                return [TextContent(type="text", text=f"Screenshot: {path}")]
+            return [TextContent(type="text", text="No screenshot available")]
 
         else:
             return [TextContent(type="text", text=f"Unknown tool: {name}")]

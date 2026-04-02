@@ -15,7 +15,7 @@ except (ImportError, ValueError) as e:
 
 
 class WebKitBrowser:
-    def __init__(self, width: int = 1024, height: int = 768):
+    def __init__(self, width: int = 1024, height: int = 768, auto_screenshot: bool = False):
         if not WEBKIT_AVAILABLE:
             raise ImportError("WebKitGTK not available")
         
@@ -26,6 +26,9 @@ class WebKitBrowser:
         self._snapshot_ready = threading.Event()
         self._snapshot_surface = None
         self._current_url = None
+        self._auto_screenshot = auto_screenshot
+        self._last_screenshot_path = None
+        self._console_messages = []
         
         from gi.repository import Gtk
         self._window = Gtk.Window()
@@ -55,6 +58,22 @@ class WebKitBrowser:
         self._process_events(0.5)
         
         self._ready.clear()
+
+    def _on_console_message(self, view, message, line, source_id):
+        self._console_messages.append({
+            "message": message,
+            "line": line,
+            "source": source_id
+        })
+        return True
+
+    def get_console_messages(self) -> list:
+        """Get all captured console messages."""
+        return self._console_messages.copy()
+
+    def clear_console(self):
+        """Clear console message buffer."""
+        self._console_messages.clear()
 
     def show(self):
         """Show and raise the browser window."""
@@ -100,10 +119,32 @@ class WebKitBrowser:
             time.sleep(wait)
             self._process_events(1.0)
             
+            if self._auto_screenshot:
+                self._last_screenshot_path = self._screenshot_gtk("/tmp/auto_screenshot.png", False)
+            
             return {
                 "url": self.view.get_uri() or url,
                 "title": self.view.get_title() or ""
             }
+
+    def set_auto_screenshot(self, enabled: bool):
+        """Enable or disable auto-screenshot on navigation."""
+        self._auto_screenshot = enabled
+
+    def get_last_screenshot(self) -> str:
+        """Get path to the last auto-screenshot."""
+        return self._last_screenshot_path or ""
+
+    def repl(self, script: str) -> str:
+        """Execute JavaScript and return pretty-printed result."""
+        result = self._execute_js(script)
+        if result is None:
+            return "null"
+        try:
+            parsed = json.loads(result)
+            return json.dumps(parsed, indent=2)
+        except (json.JSONDecodeError, TypeError):
+            return str(result) if result else "null"
 
     def get_html(self) -> str:
         with self._lock:
