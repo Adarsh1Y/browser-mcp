@@ -97,6 +97,63 @@ class WebKitBrowser:
         except Exception:
             pass
 
+    def ping(self) -> bool:
+        """Check if browser is still alive."""
+        try:
+            return self._window.get_visible() or self.view.get_uri() is not None
+        except Exception:
+            return False
+
+    def click_at(self, x: int, y: int):
+        """Click at specific X,Y coordinates."""
+        script = f"""
+        (function() {{
+            var element = document.elementFromPoint({x}, {y});
+            if(element) {{
+                element.click();
+                return 'clicked at ' + {x} + ',' + {y};
+            }}
+            return 'no element at position';
+        }})()
+        """
+        return self._execute_js(script)
+
+    def hover(self, selector: str, is_xpath: bool = False):
+        """Hover over an element."""
+        if is_xpath:
+            script = f"(function(){{var el=document.evaluate('{selector}',document,null,XPathResult.FIRST_ORDERED_NODE_TYPE,null).singleNodeValue;if(el){{el.dispatchEvent(new MouseEvent('mouseenter',{{bubbles:true}}));el.dispatchEvent(new MouseEvent('mouseover',{{bubbles:true}}));return'hovered';}}return'not found';}})()"
+        else:
+            script = f"(function(){{var el=document.querySelector('{selector}');if(el){{el.dispatchEvent(new MouseEvent('mouseenter',{{bubbles:true}}));el.dispatchEvent(new MouseEvent('mouseover',{{bubbles:true}}));return'hovered';}}return'not found';}})()"
+        return self._execute_js(script)
+
+    def click_containing(self, text: str):
+        """Click element containing specific text."""
+        escaped_text = text.replace("'", "\\'")
+        script = f"""
+        (function() {{
+            var el = Array.from(document.querySelectorAll('a, button, [role=\"button\"], input[type=\"submit\"], label'))
+                .find(e => e.textContent.includes('{escaped_text}'));
+            if (el) {{
+                el.click();
+                return 'clicked: ' + el.tagName;
+            }}
+            var allEls = document.querySelectorAll('*');
+            for (var e of allEls) {{
+                if (e.textContent.includes('{escaped_text}') && (e.click || e.onclick)) {{
+                    e.click();
+                    return 'clicked: ' + e.tagName;
+                }}
+            }}
+            return 'not found';
+        }})()
+        """
+        return self._execute_js(script)
+
+    def click_nth(self, selector: str, n: int):
+        """Click the nth element matching selector."""
+        script = f"(function(){{var els=document.querySelectorAll('{selector}');if(els[{n-1}]{{els[{n-1}].click();return'clicked ' + ({n});}}return'not found';}})()"
+        return self._execute_js(script)
+
     def _on_load_changed(self, view, load_event):
         if load_event == WebKit.LoadEvent.FINISHED:
             self._ready.set()

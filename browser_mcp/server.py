@@ -32,9 +32,16 @@ def get_browser() -> "WebKitBrowser":
             "  Arch: sudo pacman -S webkit2gtk4.1 python-gobject python-cairo gobject-introspection"
         )
     
-    if _browser_instance is None:
-        _browser_instance = WebKitBrowser()
+    if _browser_instance is not None:
+        try:
+            if _browser_instance.ping():
+                return _browser_instance
+            else:
+                _browser_instance = None
+        except Exception:
+            _browser_instance = None
     
+    _browser_instance = WebKitBrowser()
     return _browser_instance
 
 
@@ -224,6 +231,58 @@ async def list_tools() -> list[Tool]:
             description="Close the browser and cleanup resources",
             inputSchema={"type": "object", "properties": {}},
         ),
+        Tool(
+            name="ping",
+            description="Check if browser is alive and responsive",
+            inputSchema={"type": "object", "properties": {}},
+        ),
+        Tool(
+            name="click_at",
+            description="Click at specific X,Y coordinates on the page",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "x": {"type": "integer", "description": "X coordinate"},
+                    "y": {"type": "integer", "description": "Y coordinate"},
+                },
+                "required": ["x", "y"],
+            },
+        ),
+        Tool(
+            name="hover",
+            description="Hover over an element by CSS selector or XPath",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "selector": {"type": "string", "description": "CSS selector or XPath"},
+                    "xpath": {"type": "boolean", "description": "If true, treat selector as XPath"},
+                },
+                "required": ["selector"],
+            },
+        ),
+        Tool(
+            name="click_containing",
+            description="Click element containing specific text",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "text": {"type": "string", "description": "Text to search for in element"},
+                },
+                "required": ["text"],
+            },
+        ),
+        Tool(
+            name="click_nth",
+            description="Click the nth element matching a CSS selector",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "selector": {"type": "string", "description": "CSS selector"},
+                    "n": {"type": "integer", "description": "Which element (1-based index)"},
+                },
+                "required": ["selector", "n"],
+            },
+        ),
     ]
 
 
@@ -351,6 +410,37 @@ async def call_tool(name: str, arguments: dict[str, Any]) -> list[TextContent]:
         elif name == "close_browser":
             reset_browser()
             return [TextContent(type="text", text="Browser closed")]
+
+        elif name == "ping":
+            try:
+                result = await run_in_thread(browser.ping)
+                status = "alive" if result else "not responding"
+                return [TextContent(type="text", text=f"Browser {status}")]
+            except Exception as e:
+                return [TextContent(type="text", text=f"Browser error: {str(e)}")]
+
+        elif name == "click_at":
+            x = arguments.get("x", 0)
+            y = arguments.get("y", 0)
+            result = await run_in_thread(browser.click_at, x, y)
+            return [TextContent(type="text", text=f"Click at ({x}, {y}): {result}")]
+
+        elif name == "hover":
+            selector = arguments.get("selector", "")
+            xpath = arguments.get("xpath", False)
+            result = await run_in_thread(browser.hover, selector, xpath)
+            return [TextContent(type="text", text=f"Hover: {result}")]
+
+        elif name == "click_containing":
+            text = arguments.get("text", "")
+            result = await run_in_thread(browser.click_containing, text)
+            return [TextContent(type="text", text=f"Click: {result}")]
+
+        elif name == "click_nth":
+            selector = arguments.get("selector", "")
+            n = arguments.get("n", 1)
+            result = await run_in_thread(browser.click_nth, selector, n)
+            return [TextContent(type="text", text=f"Click #{n}: {result}")]
 
         else:
             return [TextContent(type="text", text=f"Unknown tool: {name}")]
