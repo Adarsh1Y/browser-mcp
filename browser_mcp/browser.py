@@ -2,6 +2,8 @@ import threading
 import time
 import json
 import os
+import subprocess
+import tempfile
 
 try:
     import gi
@@ -13,7 +15,7 @@ except (ImportError, ValueError) as e:
 
 
 class WebKitBrowser:
-    def __init__(self):
+    def __init__(self, width: int = 1024, height: int = 768):
         if not WEBKIT_AVAILABLE:
             raise ImportError("WebKitGTK not available")
         
@@ -21,24 +23,43 @@ class WebKitBrowser:
         self._ready = threading.Event()
         self._result_ready = threading.Event()
         self._js_result = None
+        self._snapshot_ready = threading.Event()
+        self._snapshot_surface = None
+        self._current_url = None
+        
+        from gi.repository import Gtk
+        self._window = Gtk.Window()
+        self._window.set_default_size(width, height)
         
         self.view = WebKit.WebView()
         self.view.connect("load-changed", self._on_load_changed)
+        self.view.connect("notify::estimated-load-progress", self._on_progress_changed)
         
         context = self.view.get_context()
         if context:
-            context.set_tls_errors_policy(WebKit.TLSErrorsPolicy.IGNORE)
+            try:
+                context.set_tls_errors_policy(WebKit.TLSErrorsPolicy.IGNORE)
+            except Exception:
+                pass
         
         settings = WebKit.Settings()
         settings.set_property("enable-javascript", True)
         settings.set_property("enable-webgl", False)
         self.view.set_settings(settings)
         
+        self._window.add(self.view)
+        self._window.show_all()
+        self._process_events(0.5)
+        
         self._ready.clear()
 
     def _on_load_changed(self, view, load_event):
         if load_event == WebKit.LoadEvent.FINISHED:
             self._ready.set()
+
+    def _on_progress_changed(self, view, progress):
+        if view.get_estimated_load_progress() >= 1.0:
+            self._snapshot_ready.set()
 
     def _process_events(self, duration: float = 0.1):
         end_time = time.time() + duration
@@ -49,6 +70,8 @@ class WebKitBrowser:
     def navigate(self, url: str, wait: float = 2.0) -> dict:
         with self._lock:
             self._ready.clear()
+            self._snapshot_ready.clear()
+            self._current_url = url
             self.view.load_uri(url)
             
             for _ in range(300):
@@ -113,38 +136,97 @@ class WebKitBrowser:
 
     def screenshot(self, path: str, full_page: bool = False) -> str:
         with self._lock:
-            try:
-                os.makedirs(os.path.dirname(path) if os.path.dirname(path) else '.', exist_ok=True)
-                self._process_events(1.0)
-                
-                loop = GLib.MainLoop()
-                surface_holder = [None]
-                
-                def callback(obj, result, l):
-                    try:
-                        surface_holder[0] = self.view.get_snapshot_finish(result)
-                    except Exception as e:
-                        print(f"Screenshot error: {e}")
-                    l.quit()
-                
-                GLib.idle_add(lambda: self.view.get_snapshot(
-                    WebKit.SnapshotRegion.VISIBLE,
-                    WebKit.SnapshotOptions.NONE,
-                    None,
-                    callback,
-                    loop
-                ) and False)
-                
-                GLib.timeout_add(5000, lambda: loop.quit())
-                loop.run()
-                
-                surface = surface_holder[0]
-                if surface:
-                    surface.write_to_png(path)
-                    return path
-            except Exception as e:
-                print(f"Screenshot error: {e}")
+            os.makedirs(os.path.dirname(path) if os.path.dirname(path) else '.', exist_ok=True)
+            
+            self._process_events(1.0)
+            
+            native_result = self._screenshot_gtk(path, full_page)
+            if native_result and os.path.exists(native_result) and os.path.getsize(native_result) > 1000:
+                return native_result
+            
+            fallback_result = self._screenshot_wkhtmltopdf(path)
+            if fallback_result:
+                return fallback_result
+            
+            fallback_result = self._screenshot_webkit2png(path)
+            if fallback_result:
+                return fallback_result
+            
             return path
+
+    def _screenshot_gtk(self, path: str, full_page: bool) -> str:
+        try:
+            import cairo
+            
+            win = self.view.get_window()
+            if not win:
+                return ""
+            
+            allocation = self.view.get_allocation()
+            width = allocation.width if allocation.width > 0 else 1024
+            height = allocation.height if allocation.height > 0 else 768
+            
+            surface = cairo.ImageSurface(cairo.FORMAT_RGB24, width, height)
+            cr = cairo.Context(surface)
+            cr.set_source_rgb(1, 1, 1)
+            cr.paint()
+            
+            try:
+                self.view.draw(cr)
+            except Exception:
+                pass
+            
+            surface.write_to_png(path)
+            
+            if os.path.exists(path) and os.path.getsize(path) > 0:
+                return path
+        except ImportError:
+            pass
+        except Exception as e:
+            print(f"GTK screenshot error: {type(e).__name__}: {e}")
+        return ""
+
+    def _screenshot_wkhtmltopdf(self, path: str) -> str:
+        try:
+            if not self._current_url:
+                return ""
+            
+            result = subprocess.run(
+                ['wkhtmltopdf', '--width', '1024', '--height', '768', 
+                 '--disable-javascript', self._current_url, path],
+                capture_output=True,
+                timeout=30
+            )
+            
+            if result.returncode == 0 and os.path.exists(path):
+                if os.path.getsize(path) > 1000:
+                    return path
+        except (FileNotFoundError, subprocess.TimeoutExpired) as e:
+            print(f"wkhtmltopdf not available: {e}")
+        except Exception as e:
+            print(f"wkhtmltopdf error: {e}")
+        return ""
+
+    def _screenshot_webkit2png(self, path: str) -> str:
+        try:
+            result = subprocess.run(
+                ['webkit2png', '-o', path, '-x', '1024', '768', self._current_url or ''],
+                capture_output=True,
+                timeout=30
+            )
+            
+            if result.returncode == 0:
+                if os.path.exists(path):
+                    return path
+                test_path = path.replace('.png', '-full.png')
+                if os.path.exists(test_path):
+                    os.rename(test_path, path)
+                    return path
+        except (FileNotFoundError, subprocess.TimeoutExpired):
+            pass
+        except Exception as e:
+            print(f"webkit2png error: {e}")
+        return ""
 
     def find_elements(self, selector: str, is_xpath: bool = False):
         if is_xpath:
@@ -170,6 +252,10 @@ def main():
     print("\nInstall dependencies:")
     print("  Arch: sudo pacman -S webkit2gtk4.1 python-gobject python-cairo gobject-introspection")
     print("  Ubuntu/Debian: sudo apt install libwebkit2gtk-4.1-dev python3-gi python3-gi-cairo gir1.2-webkit2-4.1")
+    print("\nOptional for screenshots:")
+    print("  Arch: sudo pacman -S wkhtmltopdf")
+    print("  Ubuntu: sudo apt install wkhtmltopdf")
+    print("  Or: pip install webkit2png")
     print("\nRun with: python -m browser_mcp")
 
 
